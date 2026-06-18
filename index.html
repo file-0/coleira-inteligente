@@ -113,22 +113,33 @@
             log.innerHTML += `[${hora}] ${texto}<br>`;
         }
         
-        async function scanDevices() {
-            try {
-                addLog("Buscando dispositivos...");
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
-                });
-                
-                document.getElementById('listaDispositivos').innerHTML = 
-                    `<option>${device.name || 'Dispositivo BLE'}</option>`;
-                document.getElementById('btnLigar').style.display = 'inline';
-                addLog("Dispositivo encontrado: " + device.name);
-                
-            } catch(erro) {
-                addLog("Erro: " + erro.message);
-            }
+async function scanDevices() {
+    try {
+        addLog("Buscando dispositivos...");
+        addLog("ABRA a janela e SELECIONE 'ColeiraInteligente'");
+        
+        // Tenta conectar diretamente
+        device = await navigator.bluetooth.requestDevice({
+            filters: [
+                { name: 'ColeiraInteligente' },
+                { services: [SERVICE_UUID] }
+            ],
+            optionalServices: [SERVICE_UUID]
+        });
+        
+        addLog("Dispositivo selecionado: " + device.name);
+        document.getElementById('status').innerText = 'Selecionado: ' + device.name;
+        document.getElementById('btnLigar').style.display = 'inline';
+        
+    } catch(erro) {
+        if(erro.message.includes('cancelled')) {
+            addLog("Busca cancelada. Tente novamente!");
+            addLog("Certifique-se que o ESP32 esta ligado e anunciando");
+        } else {
+            addLog("Erro: " + erro.message);
         }
+    }
+}
         
         async function conectar() {
             try {
