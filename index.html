@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coleira Inteligente - V2</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #f0f0f0; }
+        
+        .header {
+            background: #3b5998;
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+        }
+        
+        .row {
+            display: flex;
+            background: #e0e0e0;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn-azul { background: #3b5998; color: white; }
+        .btn-cinza { background: #666; color: white; }
+        .btn-verde { background: #4CAF50; color: white; }
+        
+        .texto {
+            padding: 10px;
+            background: white;
+            border: 1px solid #ccc;
+            margin: 5px;
+            flex: 1;
+        }
+        
+        .area-log {
+            background: white;
+            border: 1px solid #ccc;
+            margin: 10px;
+            padding: 20px;
+            height: 300px;
+            text-align: center;
+            color: #999;
+        }
+        
+        .select {
+            padding: 8px;
+            margin: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
+        
+        .campo {
+            padding: 10px;
+            margin: 5px 10px;
+            border: 1px solid #ddd;
+            background: white;
+            width: calc(100% - 20px);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">Coleira Inteligente - V2</div>
+    
+    <div class="row">
+        <button class="btn btn-cinza" onclick="scanDevices()">Dispositivos</button>
+        <div class="texto" id="status">Não conectado</div>
+    </div>
+    
+    <div class="row">
+        <button class="btn btn-azul" id="btnLigar" onclick="conectar()" style="display:none">Ligar</button>
+        <button class="btn btn-cinza" id="btnDesligar" onclick="desconectar()" style="display:none">Desligar</button>
+    </div>
+    
+    <center>
+        <select class="select" id="listaDispositivos">
+            <option>adicionar ite</option>
+        </select>
+    </center>
+    
+    <div class="area-log" id="logEventos">
+        Log de Eventos
+    </div>
+    
+    <center>
+        <button class="btn btn-cinza">Texto para EscolheHora1</button>
+    </center>
+    
+    <input type="text" class="campo" id="campoDistancia" placeholder="Distância" readonly>
+    
+    <input type="text" class="campo" id="campoAceleracao" placeholder="Aceleração" readonly>
+    
+    <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
+
+    <script>
+        let device, server, characteristic;
+        const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+        const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+        
+        function addLog(texto) {
+            const log = document.getElementById('logEventos');
+            const hora = new Date().toLocaleTimeString();
+            log.innerHTML += `[${hora}] ${texto}<br>`;
+        }
+        
+        async function scanDevices() {
+            try {
+                addLog("Buscando dispositivos...");
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }]
+                });
+                
+                document.getElementById('listaDispositivos').innerHTML = 
+                    `<option>${device.name || 'Dispositivo BLE'}</option>`;
+                document.getElementById('btnLigar').style.display = 'inline';
+                addLog("Dispositivo encontrado: " + device.name);
+                
+            } catch(erro) {
+                addLog("Erro: " + erro.message);
+            }
+        }
+        
+        async function conectar() {
+            try {
+                addLog("Conectando...");
+                
+                device.addEventListener('gattserverdisconnected', desconectado);
+                server = await device.gatt.connect();
+                
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', receberDados);
+                
+                document.getElementById('status').innerText = 'Conectado';
+                document.getElementById('btnLigar').style.display = 'none';
+                document.getElementById('btnDesligar').style.display = 'inline';
+                addLog("Conectado com sucesso!");
+                
+            } catch(erro) {
+                addLog("Erro ao conectar: " + erro.message);
+            }
+        }
+        
+        function desconectar() {
+            if(device && device.gatt.connected) {
+                device.gatt.disconnect();
+                addLog("Desconectado");
+            }
+        }
+        
+        function desconectado() {
+            document.getElementById('status').innerText = 'Não conectado';
+            document.getElementById('btnLigar').style.display = 'inline';
+            document.getElementById('btnDesligar').style.display = 'none';
+            addLog("Desconectado automaticamente");
+        }
+        
+        function receberDados(event) {
+            const valor = event.target.value;
+            const texto = new TextDecoder().decode(valor);
+            const partes = texto.split(',');
+            
+            if(partes.length >= 6) {
+                const ax = parseFloat(partes[0]).toFixed(2);
+                const ay = parseFloat(partes[1]).toFixed(2);
+                const az = parseFloat(partes[2]).toFixed(2);
+                const gx = parseFloat(partes[3]).toFixed(2);
+                const gy = parseFloat(partes[4]).toFixed(2);
+                const gz = parseFloat(partes[5]).toFixed(2);
+                
+                document.getElementById('campoAceleracao').value = 
+                    `X:${ax} Y:${ay} Z:${az}`;
+                
+                const mag = Math.sqrt(ax**2 + ay**2 + az**2);
+                let comp = 'PARADO';
+                if(mag > 1 && mag < 5) comp = 'ANDANDO';
+                if(mag >= 5) comp = 'CORRENDO';
+                
+                document.getElementById('campoComportamento').value = comp;
+                document.getElementById('campoDistancia').value = 'Conectado (RSSI: -60dBm)';
+                
+                addLog(`Dados: Acel(${ax},${ay},${az}) - ${comp}`);
+            }
+        }
+    </script>
+</body>
+</html>
