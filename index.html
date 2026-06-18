@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coleira Inteligente - V4</title>
+    <title>Coleira Inteligente - V5</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { background: #f0f0f0; }
@@ -89,32 +89,44 @@
         }
         
         .alerta {
-            background: #ffeb3b;
-            border: 2px solid #ff9800;
+            border: 2px solid #ccc;
             border-radius: 10px;
             padding: 15px;
             margin: 10px;
             text-align: center;
             font-weight: bold;
-            display: none;
+            font-size: 16px;
+            transition: all 0.3s ease;
         }
         
-        .alerta.perigo {
-            background: #ffcdd2;
-            border-color: #f44336;
-            color: #c62828;
-        }
-        
-        .alerta.atencao {
-            background: #fff9c4;
-            border-color: #ff9800;
-            color: #ef6c00;
-        }
-        
-        .alerta.normal {
+        .alerta.parado {
             background: #c8e6c9;
             border-color: #4CAF50;
             color: #2e7d32;
+        }
+        
+        .alerta.movimento-leve {
+            background: #b3e5fc;
+            border-color: #03a9f4;
+            color: #01579b;
+        }
+        
+        .alerta.andando {
+            background: #fff9c4;
+            border-color: #ffeb3b;
+            color: #f57f17;
+        }
+        
+        .alerta.correndo {
+            background: #ffe0b2;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+        
+        .alerta.agitado {
+            background: #ffcdd2;
+            border-color: #f44336;
+            color: #c62828;
         }
     </style>
 </head>
@@ -139,8 +151,8 @@
         <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
     </div>
     
-    <div class="alerta" id="alerta">
-        <div id="alertaTexto">-</div>
+    <div class="alerta parado" id="alerta">
+        <div id="alertaTexto">Aguardando dados...</div>
     </div>
     
     <div class="area-log" id="logEventos">
@@ -152,8 +164,8 @@
         let server = null;
         let characteristic = null;
         let conectado = false;
-        let lastDataTime = 0;
-        let rssiEstimate = -60;
+        let rssiBase = -55;
+        let rssiVariacao = 0;
         
         const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
         const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
@@ -208,9 +220,7 @@
                     return;
                 }
                 
-                // Remove event listeners antigos
                 device.removeEventListener('gattserverdisconnected', onDisconnected);
-                
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 server = await device.gatt.connect();
                 
@@ -221,7 +231,6 @@
                 characteristic.addEventListener('characteristicvaluechanged', receberDados);
                 
                 conectado = true;
-                lastDataTime = Date.now();
                 
                 document.getElementById('status').innerText = 'Conectado';
                 document.getElementById('btnLigar').style.display = 'none';
@@ -243,9 +252,7 @@
                 if(characteristic) {
                     try {
                         await characteristic.stopNotifications();
-                    } catch(e) {
-                        // Ignora erro se já estiver parado
-                    }
+                    } catch(e) {}
                     characteristic.removeEventListener('characteristicvaluechanged', receberDados);
                     characteristic = null;
                 }
@@ -255,9 +262,7 @@
                         if(server.connected) {
                             server.disconnect();
                         }
-                    } catch(e) {
-                        // Ignora erro
-                    }
+                    } catch(e) {}
                     server = null;
                 }
                 
@@ -288,7 +293,10 @@
             document.getElementById('campoDistancia').value = '';
             document.getElementById('campoAceleracao').value = '';
             document.getElementById('campoComportamento').value = '';
-            document.getElementById('alerta').style.display = 'none';
+            
+            const alerta = document.getElementById('alerta');
+            alerta.className = 'alerta parado';
+            document.getElementById('alertaTexto').innerText = 'Aguardando dados...';
             
             addLog("Conexão resetada. Selecione o dispositivo novamente.");
         }
@@ -313,15 +321,10 @@
                 const gy = parseFloat(partes[4]);
                 const gz = parseFloat(partes[5]);
                 
-                // Atualiza timestamp
-                lastDataTime = Date.now();
-                
-                // Estima RSSI baseado na latência (simulação)
-                const now = Date.now();
-                const latency = now - lastDataTime;
-                rssiEstimate = -60 - (latency * 0.1);
-                if(rssiEstimate < -90) rssiEstimate = -90;
-                if(rssiEstimate > -40) rssiEstimate = -40;
+                // Simula RSSI com variação realista (ruído)
+                rssiVariacao = (Math.random() - 0.5) * 10; // Variação de -5 a +5
+                let rssiAtual = rssiBase + rssiVariacao;
+                rssiAtual = Math.max(-90, Math.min(-40, rssiAtual));
                 
                 // Calcula magnitude da aceleração
                 const mag = Math.sqrt(ax**2 + ay**2 + az**2);
@@ -331,24 +334,36 @@
                 
                 // Interpreta comportamento
                 let comportamento = '';
+                let classeAlerta = '';
+                let mensagemAlerta = '';
                 
                 if(mag < 10.5 && giroMag < 0.1) {
                     comportamento = 'PARADO';
+                    classeAlerta = 'parado';
+                    mensagemAlerta = 'Animal em repouso';
                 } else if(mag < 11 && giroMag < 0.5) {
                     comportamento = 'MOVIMENTO LEVE';
+                    classeAlerta = 'movimento-leve';
+                    mensagemAlerta = 'Movimento leve detectado';
                 } else if(mag < 12 && giroMag < 1.5) {
                     comportamento = 'ANDANDO';
+                    classeAlerta = 'andando';
+                    mensagemAlerta = 'Animal em caminhada';
                 } else if(mag >= 12 || giroMag >= 1.5) {
                     comportamento = 'CORRENDO';
+                    classeAlerta = 'correndo';
+                    mensagemAlerta = 'Animal correndo';
                 } else {
                     comportamento = 'AGITADO';
+                    classeAlerta = 'agitado';
+                    mensagemAlerta = 'Animal agitado/estressado';
                 }
                 
                 // Estima distância baseada no RSSI
-                let distancia = 'Desconhecida';
-                if(rssiEstimate > -50) {
+                let distancia = '';
+                if(rssiAtual > -50) {
                     distancia = 'Próximo (< 1m)';
-                } else if(rssiEstimate > -70) {
+                } else if(rssiAtual > -70) {
                     distancia = 'Médio (1-3m)';
                 } else {
                     distancia = 'Distante (> 3m)';
@@ -356,7 +371,7 @@
                 
                 // Atualiza campos
                 document.getElementById('campoDistancia').value = 
-                    `RSSI: ${rssiEstimate.toFixed(0)} dBm - ${distancia}`;
+                    `RSSI: ${rssiAtual.toFixed(0)} dBm - ${distancia}`;
                 
                 document.getElementById('campoAceleracao').value = 
                     `${comportamento} (Magnitude: ${mag.toFixed(1)} m/s²)`;
@@ -364,31 +379,12 @@
                 document.getElementById('campoComportamento').value = 
                     `Estado: ${comportamento}`;
                 
-                // Gera alertas contextuais
-                gerarAlerta(comportamento, distancia, mag, giroMag);
+                // Atualiza alerta SEMPRE visível
+                const alerta = document.getElementById('alerta');
+                alerta.className = `alerta ${classeAlerta}`;
+                document.getElementById('alertaTexto').innerText = mensagemAlerta;
                 
-                addLog(`${comportamento} | RSSI: ${rssiEstimate.toFixed(0)} dBm | Mag: ${mag.toFixed(1)}`);
-            }
-        }
-        
-        function gerarAlerta(comportamento, distancia, mag, giroMag) {
-            const alerta = document.getElementById('alerta');
-            const alertaTexto = document.getElementById('alertaTexto');
-            
-            if(comportamento === 'CORRENDO' && distancia.includes('Distante')) {
-                alerta.className = 'alerta perigo';
-                alertaTexto.innerText = 'ALERTA: Possível fuga detectada!';
-                alerta.style.display = 'block';
-            } else if(giroMag > 2 && comportamento === 'AGITADO') {
-                alerta.className = 'alerta atencao';
-                alertaTexto.innerText = 'Atenção: Animal agitado/estressado';
-                alerta.style.display = 'block';
-            } else if(comportamento === 'PARADO') {
-                alerta.className = 'alerta normal';
-                alertaTexto.innerText = 'Animal em repouso';
-                alerta.style.display = 'block';
-            } else {
-                alerta.style.display = 'none';
+                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Mag: ${mag.toFixed(1)}`);
             }
         }
     </script>
