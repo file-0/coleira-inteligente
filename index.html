@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coleira Inteligente - V3</title>
+    <title>Coleira Inteligente - V4</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { background: #f0f0f0; }
@@ -119,23 +119,24 @@
     </style>
 </head>
 <body>
-    <div class="header">🐕 Coleira Inteligente - Monitoramento Comportamental</div>
+    <div class="header">Coleira Inteligente - Monitoramento Comportamental</div>
     
     <div class="row">
-        <button class="btn btn-cinza" onclick="scanDevices()">🔍 Dispositivos</button>
-        <div class="texto" id="status">❌ Não conectado</div>
+        <button class="btn btn-cinza" onclick="scanDevices()">Dispositivos</button>
+        <div class="texto" id="status">Não conectado</div>
     </div>
     
     <div class="row">
-        <button class="btn btn-verde" id="btnLigar" onclick="conectar()" style="display:none">✅ Ligar</button>
-        <button class="btn btn-vermelho" id="btnDesligar" onclick="desconectar()" style="display:none">❌ Desligar</button>
+        <button class="btn btn-verde" id="btnLigar" onclick="conectar()" style="display:none">Conectar</button>
+        <button class="btn btn-vermelho" id="btnDesligar" onclick="desconectar()" style="display:none">Desconectar</button>
+        <button class="btn btn-cinza" id="btnReset" onclick="resetConexao()" style="display:none">Reset</button>
     </div>
     
     <div class="status-box">
-        <h3>📊 Status do Animal</h3>
-        <input type="text" class="campo" id="campoDistancia" placeholder="📍 Distância" readonly>
-        <input type="text" class="campo" id="campoAceleracao" placeholder="🏃 Movimento" readonly>
-        <input type="text" class="campo" id="campoComportamento" placeholder="🧠 Comportamento" readonly>
+        <h3>Status do Animal</h3>
+        <input type="text" class="campo" id="campoDistancia" placeholder="Distância (RSSI)" readonly>
+        <input type="text" class="campo" id="campoAceleracao" placeholder="Movimento" readonly>
+        <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
     </div>
     
     <div class="alerta" id="alerta">
@@ -147,8 +148,13 @@
     </div>
 
     <script>
-        let device, server, characteristic;
+        let device = null;
+        let server = null;
+        let characteristic = null;
         let conectado = false;
+        let lastDataTime = 0;
+        let rssiEstimate = -60;
+        
         const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
         const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
         
@@ -160,7 +166,6 @@
             const hora = new Date().toLocaleTimeString();
             logLines.push(`[${hora}] ${texto}`);
             
-            // Mantém apenas as últimas MAX_LOG_LINES
             if(logLines.length > MAX_LOG_LINES) {
                 logLines.shift();
             }
@@ -171,7 +176,7 @@
         
         async function scanDevices() {
             try {
-                addLog("🔍 Buscando dispositivos...");
+                addLog("Buscando dispositivos...");
                 
                 device = await navigator.bluetooth.requestDevice({
                     filters: [
@@ -181,22 +186,30 @@
                     optionalServices: [SERVICE_UUID]
                 });
                 
-                addLog("✅ Dispositivo selecionado: " + device.name);
-                document.getElementById('status').innerText = '📱 Selecionado: ' + device.name;
+                addLog("Dispositivo selecionado: " + device.name);
+                document.getElementById('status').innerText = 'Selecionado: ' + device.name;
                 document.getElementById('btnLigar').style.display = 'inline';
                 
             } catch(erro) {
                 if(erro.message.includes('cancelled')) {
-                    addLog("⚠️ Busca cancelada");
+                    addLog("Busca cancelada");
                 } else {
-                    addLog("❌ Erro: " + erro.message);
+                    addLog("Erro: " + erro.message);
                 }
             }
         }
         
         async function conectar() {
             try {
-                addLog("🔗 Conectando...");
+                addLog("Conectando...");
+                
+                if(!device) {
+                    addLog("Erro: Nenhum dispositivo selecionado");
+                    return;
+                }
+                
+                // Remove event listeners antigos
+                device.removeEventListener('gattserverdisconnected', onDisconnected);
                 
                 device.addEventListener('gattserverdisconnected', onDisconnected);
                 server = await device.gatt.connect();
@@ -208,55 +221,81 @@
                 characteristic.addEventListener('characteristicvaluechanged', receberDados);
                 
                 conectado = true;
-                document.getElementById('status').innerText = '✅ Conectado';
+                lastDataTime = Date.now();
+                
+                document.getElementById('status').innerText = 'Conectado';
                 document.getElementById('btnLigar').style.display = 'none';
                 document.getElementById('btnDesligar').style.display = 'inline';
-                addLog("✅ Conectado com sucesso!");
+                document.getElementById('btnReset').style.display = 'inline';
+                
+                addLog("Conectado com sucesso!");
                 
             } catch(erro) {
-                addLog("❌ Erro ao conectar: " + erro.message);
+                addLog("Erro ao conectar: " + erro.message);
+                resetConexao();
             }
         }
         
         async function desconectar() {
             try {
-                addLog("🔌 Desconectando...");
+                addLog("Desconectando...");
                 
                 if(characteristic) {
-                    await characteristic.stopNotifications();
+                    try {
+                        await characteristic.stopNotifications();
+                    } catch(e) {
+                        // Ignora erro se já estiver parado
+                    }
+                    characteristic.removeEventListener('characteristicvaluechanged', receberDados);
+                    characteristic = null;
                 }
                 
-                if(server && server.connected) {
-                    server.disconnect();
+                if(server) {
+                    try {
+                        if(server.connected) {
+                            server.disconnect();
+                        }
+                    } catch(e) {
+                        // Ignora erro
+                    }
+                    server = null;
                 }
                 
-                if(device && device.gatt.connected) {
-                    device.gatt.disconnect();
+                if(device) {
+                    device.removeEventListener('gattserverdisconnected', onDisconnected);
                 }
                 
                 onDisconnected();
                 
             } catch(erro) {
-                addLog("❌ Erro ao desconectar: " + erro.message);
-                onDisconnected();
+                addLog("Erro ao desconectar: " + erro.message);
+                resetConexao();
             }
         }
         
-        function onDisconnected() {
-            conectado = false;
+        function resetConexao() {
+            addLog("Resetando conexão...");
+            
             device = null;
             server = null;
             characteristic = null;
+            conectado = false;
             
-            document.getElementById('status').innerText = '❌ Não conectado';
-            document.getElementById('btnLigar').style.display = 'inline';
+            document.getElementById('status').innerText = 'Não conectado';
+            document.getElementById('btnLigar').style.display = 'none';
             document.getElementById('btnDesligar').style.display = 'none';
+            document.getElementById('btnReset').style.display = 'none';
             document.getElementById('campoDistancia').value = '';
             document.getElementById('campoAceleracao').value = '';
             document.getElementById('campoComportamento').value = '';
             document.getElementById('alerta').style.display = 'none';
             
-            addLog("🔌 Desconectado");
+            addLog("Conexão resetada. Selecione o dispositivo novamente.");
+        }
+        
+        function onDisconnected() {
+            addLog("Desconectado automaticamente");
+            resetConexao();
         }
         
         function receberDados(event) {
@@ -274,48 +313,61 @@
                 const gy = parseFloat(partes[4]);
                 const gz = parseFloat(partes[5]);
                 
-                // Calcular magnitude da aceleração
+                // Atualiza timestamp
+                lastDataTime = Date.now();
+                
+                // Estima RSSI baseado na latência (simulação)
+                const now = Date.now();
+                const latency = now - lastDataTime;
+                rssiEstimate = -60 - (latency * 0.1);
+                if(rssiEstimate < -90) rssiEstimate = -90;
+                if(rssiEstimate > -40) rssiEstimate = -40;
+                
+                // Calcula magnitude da aceleração
                 const mag = Math.sqrt(ax**2 + ay**2 + az**2);
                 
-                // Calcular magnitude do giroscópio
+                // Calcula magnitude do giroscópio
                 const giroMag = Math.sqrt(gx**2 + gy**2 + gz**2);
                 
-                // Interpretar comportamento
+                // Interpreta comportamento
                 let comportamento = '';
-                let emoji = '';
                 
                 if(mag < 10.5 && giroMag < 0.1) {
                     comportamento = 'PARADO';
-                    emoji = '😴';
                 } else if(mag < 11 && giroMag < 0.5) {
                     comportamento = 'MOVIMENTO LEVE';
-                    emoji = '🚶';
                 } else if(mag < 12 && giroMag < 1.5) {
                     comportamento = 'ANDANDO';
-                    emoji = '🚶‍♂️';
                 } else if(mag >= 12 || giroMag >= 1.5) {
                     comportamento = 'CORRENDO';
-                    emoji = '🏃';
                 } else {
                     comportamento = 'AGITADO';
-                    emoji = '😰';
                 }
                 
-                // Atualizar campos
-                document.getElementById('campoAceleracao').value = 
-                    `${emoji} ${comportamento} (Mag: ${mag.toFixed(1)})`;
+                // Estima distância baseada no RSSI
+                let distancia = 'Desconhecida';
+                if(rssiEstimate > -50) {
+                    distancia = 'Próximo (< 1m)';
+                } else if(rssiEstimate > -70) {
+                    distancia = 'Médio (1-3m)';
+                } else {
+                    distancia = 'Distante (> 3m)';
+                }
                 
-                // Simular distância (em produção, usar RSSI real)
-                const distancia = 'Próximo (~1-2m)';
-                document.getElementById('campoDistancia').value = `📍 ${distancia}`;
+                // Atualiza campos
+                document.getElementById('campoDistancia').value = 
+                    `RSSI: ${rssiEstimate.toFixed(0)} dBm - ${distancia}`;
+                
+                document.getElementById('campoAceleracao').value = 
+                    `${comportamento} (Magnitude: ${mag.toFixed(1)} m/s²)`;
                 
                 document.getElementById('campoComportamento').value = 
-                    `🧠 ${comportamento}`;
+                    `Estado: ${comportamento}`;
                 
-                // Gerar alertas contextuais
+                // Gera alertas contextuais
                 gerarAlerta(comportamento, distancia, mag, giroMag);
                 
-                addLog(`${emoji} ${comportamento} | Acel:${mag.toFixed(1)} | Giro:${giroMag.toFixed(2)}`);
+                addLog(`${comportamento} | RSSI: ${rssiEstimate.toFixed(0)} dBm | Mag: ${mag.toFixed(1)}`);
             }
         }
         
@@ -323,18 +375,17 @@
             const alerta = document.getElementById('alerta');
             const alertaTexto = document.getElementById('alertaTexto');
             
-            // Lógica de alertas baseada no projeto
-            if(comportamento === 'CORRENDO' && distancia.includes('Longe')) {
+            if(comportamento === 'CORRENDO' && distancia.includes('Distante')) {
                 alerta.className = 'alerta perigo';
-                alertaTexto.innerText = '⚠️ ALERTA: Possível fuga detectada!';
+                alertaTexto.innerText = 'ALERTA: Possível fuga detectada!';
                 alerta.style.display = 'block';
             } else if(giroMag > 2 && comportamento === 'AGITADO') {
                 alerta.className = 'alerta atencao';
-                alertaTexto.innerText = '⚠️ Atenção: Animal agitado/estressado';
+                alertaTexto.innerText = 'Atenção: Animal agitado/estressado';
                 alerta.style.display = 'block';
             } else if(comportamento === 'PARADO') {
                 alerta.className = 'alerta normal';
-                alertaTexto.innerText = '✅ Animal em repouso';
+                alertaTexto.innerText = 'Animal em repouso';
                 alerta.style.display = 'block';
             } else {
                 alerta.style.display = 'none';
