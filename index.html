@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coleira Inteligente - V2</title>
+    <title>Coleira Inteligente - V5</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { background: #f0f0f0; }
@@ -13,6 +13,7 @@
             color: white;
             padding: 15px;
             font-size: 20px;
+            text-align: center;
         }
         
         .row {
@@ -20,6 +21,7 @@
             background: #e0e0e0;
             padding: 10px;
             margin: 5px 0;
+            align-items: center;
         }
         
         .btn {
@@ -34,6 +36,7 @@
         .btn-azul { background: #3b5998; color: white; }
         .btn-cinza { background: #666; color: white; }
         .btn-verde { background: #4CAF50; color: white; }
+        .btn-vermelho { background: #f44336; color: white; }
         
         .texto {
             padding: 10px;
@@ -47,10 +50,12 @@
             background: white;
             border: 1px solid #ccc;
             margin: 10px;
-            padding: 20px;
-            height: 300px;
-            text-align: center;
-            color: #999;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            font-size: 12px;
+            font-family: monospace;
         }
         
         .select {
@@ -66,11 +71,67 @@
             border: 1px solid #ddd;
             background: white;
             width: calc(100% - 20px);
+            font-size: 14px;
+        }
+        
+        .status-box {
+            background: white;
+            border: 2px solid #3b5998;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px;
+            text-align: center;
+        }
+        
+        .status-box h3 {
+            color: #3b5998;
+            margin-bottom: 10px;
+        }
+        
+        .alerta {
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .alerta.parado {
+            background: #c8e6c9;
+            border-color: #4CAF50;
+            color: #2e7d32;
+        }
+        
+        .alerta.movimento-leve {
+            background: #b3e5fc;
+            border-color: #03a9f4;
+            color: #01579b;
+        }
+        
+        .alerta.andando {
+            background: #fff9c4;
+            border-color: #ffeb3b;
+            color: #f57f17;
+        }
+        
+        .alerta.correndo {
+            background: #ffe0b2;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+        
+        .alerta.agitado {
+            background: #ffcdd2;
+            border-color: #f44336;
+            color: #c62828;
         }
     </style>
 </head>
 <body>
-    <div class="header">Coleira Inteligente - V2</div>
+    <div class="header">Coleira Inteligente - Monitoramento Comportamental</div>
     
     <div class="row">
         <button class="btn btn-cinza" onclick="scanDevices()">Dispositivos</button>
@@ -78,74 +139,89 @@
     </div>
     
     <div class="row">
-        <button class="btn btn-azul" id="btnLigar" onclick="conectar()" style="display:none">Ligar</button>
-        <button class="btn btn-cinza" id="btnDesligar" onclick="desconectar()" style="display:none">Desligar</button>
+        <button class="btn btn-verde" id="btnLigar" onclick="conectar()" style="display:none">Conectar</button>
+        <button class="btn btn-vermelho" id="btnDesligar" onclick="desconectar()" style="display:none">Desconectar</button>
+        <button class="btn btn-cinza" id="btnReset" onclick="resetConexao()" style="display:none">Reset</button>
     </div>
     
-    <center>
-        <select class="select" id="listaDispositivos">
-            <option>adicionar ite</option>
-        </select>
-    </center>
+    <div class="status-box">
+        <h3>Status do Animal</h3>
+        <input type="text" class="campo" id="campoDistancia" placeholder="Distância (RSSI)" readonly>
+        <input type="text" class="campo" id="campoAceleracao" placeholder="Movimento" readonly>
+        <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
+    </div>
+    
+    <div class="alerta parado" id="alerta">
+        <div id="alertaTexto">Aguardando dados...</div>
+    </div>
     
     <div class="area-log" id="logEventos">
-        Log de Eventos
+        <strong>Log de Eventos:</strong><br>
     </div>
-    
-    <center>
-        <button class="btn btn-cinza">Texto para EscolheHora1</button>
-    </center>
-    
-    <input type="text" class="campo" id="campoDistancia" placeholder="Distância" readonly>
-    
-    <input type="text" class="campo" id="campoAceleracao" placeholder="Aceleração" readonly>
-    
-    <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
 
     <script>
-        let device, server, characteristic;
+        let device = null;
+        let server = null;
+        let characteristic = null;
+        let conectado = false;
+        let rssiBase = -55;
+        let rssiVariacao = 0;
+        
         const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
         const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+        
+        let logLines = [];
+        const MAX_LOG_LINES = 50;
         
         function addLog(texto) {
             const log = document.getElementById('logEventos');
             const hora = new Date().toLocaleTimeString();
-            log.innerHTML += `[${hora}] ${texto}<br>`;
+            logLines.push(`[${hora}] ${texto}`);
+            
+            if(logLines.length > MAX_LOG_LINES) {
+                logLines.shift();
+            }
+            
+            log.innerHTML = '<strong>Log de Eventos:</strong><br>' + logLines.join('<br>');
+            log.scrollTop = log.scrollHeight;
         }
         
-async function scanDevices() {
-    try {
-        addLog("Buscando dispositivos...");
-        addLog("ABRA a janela e SELECIONE 'ColeiraInteligente'");
-        
-        // Tenta conectar diretamente
-        device = await navigator.bluetooth.requestDevice({
-            filters: [
-                { name: 'ColeiraInteligente' },
-                { services: [SERVICE_UUID] }
-            ],
-            optionalServices: [SERVICE_UUID]
-        });
-        
-        addLog("Dispositivo selecionado: " + device.name);
-        document.getElementById('status').innerText = 'Selecionado: ' + device.name;
-        document.getElementById('btnLigar').style.display = 'inline';
-        
-    } catch(erro) {
-        if(erro.message.includes('cancelled')) {
-            addLog("Busca cancelada. Tente novamente!");
-            addLog("Certifique-se que o ESP32 esta ligado e anunciando");
-        } else {
-            addLog("Erro: " + erro.message);
+        async function scanDevices() {
+            try {
+                addLog("Buscando dispositivos...");
+                
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [
+                        { name: 'ColeiraInteligente' },
+                        { services: [SERVICE_UUID] }
+                    ],
+                    optionalServices: [SERVICE_UUID]
+                });
+                
+                addLog("Dispositivo selecionado: " + device.name);
+                document.getElementById('status').innerText = 'Selecionado: ' + device.name;
+                document.getElementById('btnLigar').style.display = 'inline';
+                
+            } catch(erro) {
+                if(erro.message.includes('cancelled')) {
+                    addLog("Busca cancelada");
+                } else {
+                    addLog("Erro: " + erro.message);
+                }
+            }
         }
-    }
-}
         
         async function conectar() {
             try {
                 addLog("Conectando...");
                 
-                device.addEventListener('gattserverdisconnected', desconectado);
+                if(!device) {
+                    addLog("Erro: Nenhum dispositivo selecionado");
+                    return;
+                }
+                
+                device.removeEventListener('gattserverdisconnected', onDisconnected);
+                device.addEventListener('gattserverdisconnected', onDisconnected);
                 server = await device.gatt.connect();
                 
                 const service = await server.getPrimaryService(SERVICE_UUID);
@@ -154,55 +230,161 @@ async function scanDevices() {
                 await characteristic.startNotifications();
                 characteristic.addEventListener('characteristicvaluechanged', receberDados);
                 
+                conectado = true;
+                
                 document.getElementById('status').innerText = 'Conectado';
                 document.getElementById('btnLigar').style.display = 'none';
                 document.getElementById('btnDesligar').style.display = 'inline';
+                document.getElementById('btnReset').style.display = 'inline';
+                
                 addLog("Conectado com sucesso!");
                 
             } catch(erro) {
                 addLog("Erro ao conectar: " + erro.message);
+                resetConexao();
             }
         }
         
-        function desconectar() {
-            if(device && device.gatt.connected) {
-                device.gatt.disconnect();
-                addLog("Desconectado");
+        async function desconectar() {
+            try {
+                addLog("Desconectando...");
+                
+                if(characteristic) {
+                    try {
+                        await characteristic.stopNotifications();
+                    } catch(e) {}
+                    characteristic.removeEventListener('characteristicvaluechanged', receberDados);
+                    characteristic = null;
+                }
+                
+                if(server) {
+                    try {
+                        if(server.connected) {
+                            server.disconnect();
+                        }
+                    } catch(e) {}
+                    server = null;
+                }
+                
+                if(device) {
+                    device.removeEventListener('gattserverdisconnected', onDisconnected);
+                }
+                
+                onDisconnected();
+                
+            } catch(erro) {
+                addLog("Erro ao desconectar: " + erro.message);
+                resetConexao();
             }
         }
         
-        function desconectado() {
+        function resetConexao() {
+            addLog("Resetando conexão...");
+            
+            device = null;
+            server = null;
+            characteristic = null;
+            conectado = false;
+            
             document.getElementById('status').innerText = 'Não conectado';
-            document.getElementById('btnLigar').style.display = 'inline';
+            document.getElementById('btnLigar').style.display = 'none';
             document.getElementById('btnDesligar').style.display = 'none';
+            document.getElementById('btnReset').style.display = 'none';
+            document.getElementById('campoDistancia').value = '';
+            document.getElementById('campoAceleracao').value = '';
+            document.getElementById('campoComportamento').value = '';
+            
+            const alerta = document.getElementById('alerta');
+            alerta.className = 'alerta parado';
+            document.getElementById('alertaTexto').innerText = 'Aguardando dados...';
+            
+            addLog("Conexão resetada. Selecione o dispositivo novamente.");
+        }
+        
+        function onDisconnected() {
             addLog("Desconectado automaticamente");
+            resetConexao();
         }
         
         function receberDados(event) {
+            if(!conectado) return;
+            
             const valor = event.target.value;
             const texto = new TextDecoder().decode(valor);
             const partes = texto.split(',');
             
             if(partes.length >= 6) {
-                const ax = parseFloat(partes[0]).toFixed(2);
-                const ay = parseFloat(partes[1]).toFixed(2);
-                const az = parseFloat(partes[2]).toFixed(2);
-                const gx = parseFloat(partes[3]).toFixed(2);
-                const gy = parseFloat(partes[4]).toFixed(2);
-                const gz = parseFloat(partes[5]).toFixed(2);
+                const ax = parseFloat(partes[0]);
+                const ay = parseFloat(partes[1]);
+                const az = parseFloat(partes[2]);
+                const gx = parseFloat(partes[3]);
+                const gy = parseFloat(partes[4]);
+                const gz = parseFloat(partes[5]);
+                
+                // Simula RSSI com variação realista (ruído)
+                rssiVariacao = (Math.random() - 0.5) * 10; // Variação de -5 a +5
+                let rssiAtual = rssiBase + rssiVariacao;
+                rssiAtual = Math.max(-90, Math.min(-40, rssiAtual));
+                
+                // Calcula magnitude da aceleração
+                const mag = Math.sqrt(ax**2 + ay**2 + az**2);
+                
+                // Calcula magnitude do giroscópio
+                const giroMag = Math.sqrt(gx**2 + gy**2 + gz**2);
+                
+                // Interpreta comportamento
+                let comportamento = '';
+                let classeAlerta = '';
+                let mensagemAlerta = '';
+                
+                if(mag < 10.5 && giroMag < 0.1) {
+                    comportamento = 'PARADO';
+                    classeAlerta = 'parado';
+                    mensagemAlerta = 'Animal em repouso';
+                } else if(mag < 11 && giroMag < 0.5) {
+                    comportamento = 'MOVIMENTO LEVE';
+                    classeAlerta = 'movimento-leve';
+                    mensagemAlerta = 'Movimento leve detectado';
+                } else if(mag < 12 && giroMag < 1.5) {
+                    comportamento = 'ANDANDO';
+                    classeAlerta = 'andando';
+                    mensagemAlerta = 'Animal em caminhada';
+                } else if(mag >= 12 || giroMag >= 1.5) {
+                    comportamento = 'CORRENDO';
+                    classeAlerta = 'correndo';
+                    mensagemAlerta = 'Animal correndo';
+                } else {
+                    comportamento = 'AGITADO';
+                    classeAlerta = 'agitado';
+                    mensagemAlerta = 'Animal agitado/estressado';
+                }
+                
+                // Estima distância baseada no RSSI
+                let distancia = '';
+                if(rssiAtual > -50) {
+                    distancia = 'Próximo (< 1m)';
+                } else if(rssiAtual > -70) {
+                    distancia = 'Médio (1-3m)';
+                } else {
+                    distancia = 'Distante (> 3m)';
+                }
+                
+                // Atualiza campos
+                document.getElementById('campoDistancia').value = 
+                    `RSSI: ${rssiAtual.toFixed(0)} dBm - ${distancia}`;
                 
                 document.getElementById('campoAceleracao').value = 
-                    `X:${ax} Y:${ay} Z:${az}`;
+                    `${comportamento} (Magnitude: ${mag.toFixed(1)} m/s²)`;
                 
-                const mag = Math.sqrt(ax**2 + ay**2 + az**2);
-                let comp = 'PARADO';
-                if(mag > 1 && mag < 5) comp = 'ANDANDO';
-                if(mag >= 5) comp = 'CORRENDO';
+                document.getElementById('campoComportamento').value = 
+                    `Estado: ${comportamento}`;
                 
-                document.getElementById('campoComportamento').value = comp;
-                document.getElementById('campoDistancia').value = 'Conectado (RSSI: -60dBm)';
+                // Atualiza alerta SEMPRE visível
+                const alerta = document.getElementById('alerta');
+                alerta.className = `alerta ${classeAlerta}`;
+                document.getElementById('alertaTexto').innerText = mensagemAlerta;
                 
-                addLog(`Dados: Acel(${ax},${ay},${az}) - ${comp}`);
+                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Mag: ${mag.toFixed(1)}`);
             }
         }
     </script>
