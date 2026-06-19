@@ -140,12 +140,12 @@
     
     <div class="row">
         <button class="btn btn-verde" id="btnLigar" onclick="conectar()" style="display:none">Conectar</button>
+        <button class="btn btn-cinza" id="btnLimparLogs" onclick="limparLogs()" style="display:none">Limpar Logs</button>
         <button class="btn btn-vermelho" id="btnDesligar" onclick="desconectar()" style="display:none">Desconectar</button>
-        <button class="btn btn-cinza" id="btnReset" onclick="resetConexao()" style="display:none">Reset</button>
     </div>
     
     <div class="status-box">
-        <h3>Status do Animal</h3>
+        <h3>Status</h3>
         <input type="text" class="campo" id="campoDistancia" placeholder="Distância (RSSI)" readonly>
         <input type="text" class="campo" id="campoAceleracao" placeholder="Movimento" readonly>
         <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
@@ -186,6 +186,13 @@
             log.scrollTop = log.scrollHeight;
         }
         
+        function limparLogs() {
+            logLines = [];
+            const log = document.getElementById('logEventos');
+            log.innerHTML = '<strong>Log de Eventos:</strong><br>';
+            addLog("Logs limpos");
+        }
+        
         async function scanDevices() {
             try {
                 addLog("Buscando dispositivos...");
@@ -201,6 +208,7 @@
                 addLog("Dispositivo selecionado: " + device.name);
                 document.getElementById('status').innerText = 'Selecionado: ' + device.name;
                 document.getElementById('btnLigar').style.display = 'inline';
+                document.getElementById('btnLimparLogs').style.display = 'inline';
                 
             } catch(erro) {
                 if(erro.message.includes('cancelled')) {
@@ -235,7 +243,6 @@
                 document.getElementById('status').innerText = 'Conectado';
                 document.getElementById('btnLigar').style.display = 'none';
                 document.getElementById('btnDesligar').style.display = 'inline';
-                document.getElementById('btnReset').style.display = 'inline';
                 
                 addLog("Conectado com sucesso!");
                 
@@ -289,7 +296,7 @@
             document.getElementById('status').innerText = 'Não conectado';
             document.getElementById('btnLigar').style.display = 'none';
             document.getElementById('btnDesligar').style.display = 'none';
-            document.getElementById('btnReset').style.display = 'none';
+            document.getElementById('btnLimparLogs').style.display = 'none';
             document.getElementById('campoDistancia').value = '';
             document.getElementById('campoAceleracao').value = '';
             document.getElementById('campoComportamento').value = '';
