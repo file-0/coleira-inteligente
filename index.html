@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coleira Inteligente - V6</title>
+    <title>Coleira Inteligente - V5</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
         body { background: #f0f0f0; }
@@ -22,7 +22,6 @@
             padding: 10px;
             margin: 5px 0;
             align-items: center;
-            flex-wrap: wrap;
         }
         
         .btn {
@@ -34,10 +33,10 @@
             font-size: 14px;
         }
         
+        .btn-azul { background: #3b5998; color: white; }
         .btn-cinza { background: #666; color: white; }
         .btn-verde { background: #4CAF50; color: white; }
         .btn-vermelho { background: #f44336; color: white; }
-        .btn-amarelo { background: #ff9800; color: white; }
         
         .texto {
             padding: 10px;
@@ -45,7 +44,6 @@
             border: 1px solid #ccc;
             margin: 5px;
             flex: 1;
-            min-width: 200px;
         }
         
         .area-log {
@@ -58,6 +56,13 @@
             overflow-x: hidden;
             font-size: 12px;
             font-family: monospace;
+        }
+        
+        .select {
+            padding: 8px;
+            margin: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
         }
         
         .campo {
@@ -94,26 +99,34 @@
             transition: all 0.3s ease;
         }
         
-        .alerta.parado { background: #c8e6c9; border-color: #4CAF50; color: #2e7d32; }
-        .alerta.movimento-leve { background: #b3e5fc; border-color: #03a9f4; color: #01579b; }
-        .alerta.andando { background: #fff9c4; border-color: #ffeb3b; color: #f57f17; }
-        .alerta.correndo { background: #ffe0b2; border-color: #ff9800; color: #e65100; }
-        .alerta.agitado { background: #ffcdd2; border-color: #f44336; color: #c62828; }
-        
-        .alerta.critico {
-            animation: piscar 0.6s infinite;
+        .alerta.parado {
+            background: #c8e6c9;
+            border-color: #4CAF50;
+            color: #2e7d32;
         }
         
-        @keyframes piscar {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
+        .alerta.movimento-leve {
+            background: #b3e5fc;
+            border-color: #03a9f4;
+            color: #01579b;
         }
         
-        .som-info {
-            font-size: 11px;
-            color: #666;
-            margin: 5px 10px;
-            font-style: italic;
+        .alerta.andando {
+            background: #fff9c4;
+            border-color: #ffeb3b;
+            color: #f57f17;
+        }
+        
+        .alerta.correndo {
+            background: #ffe0b2;
+            border-color: #ff9800;
+            color: #e65100;
+        }
+        
+        .alerta.agitado {
+            background: #ffcdd2;
+            border-color: #f44336;
+            color: #c62828;
         }
     </style>
 </head>
@@ -128,7 +141,6 @@
     <div class="row">
         <button class="btn btn-verde" id="btnLigar" onclick="conectar()" style="display:none">Conectar</button>
         <button class="btn btn-cinza" id="btnLimparLogs" onclick="limparLogs()" style="display:none">Limpar Logs</button>
-        <button class="btn btn-amarelo" id="btnSom" onclick="toggleSom()" style="display:none">🔊 Som: ON</button>
         <button class="btn btn-vermelho" id="btnDesligar" onclick="desconectar()" style="display:none">Desconectar</button>
     </div>
     
@@ -143,10 +155,6 @@
         <div id="alertaTexto">Aguardando dados...</div>
     </div>
     
-    <div class="som-info">
-        ℹ️ Alerta sonoro toca automaticamente em situações críticas (animal correndo/agitado + afastado)
-    </div>
-    
     <div class="area-log" id="logEventos">
         <strong>Log de Eventos:</strong><br>
     </div>
@@ -158,9 +166,6 @@
         let conectado = false;
         let rssiBase = -55;
         let rssiVariacao = 0;
-        let somAtivo = true;
-        let ultimoBeepCritico = 0;
-        const DEBOUNCE_BEEP_MS = 5000; // Não tocar beep mais de uma vez a cada 5s
         
         const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
         const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
@@ -168,61 +173,14 @@
         let logLines = [];
         const MAX_LOG_LINES = 50;
         
-        // ==================== ÁUDIO (Web Audio API) ====================
-        let audioCtx = null;
-        
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
-        
-        function tocarBeep(frequencia = 880, duracao = 0.2, tipo = 'sine') {
-            if (!somAtivo) return;
-            initAudio();
-            
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            
-            osc.type = tipo;
-            osc.frequency.value = frequencia;
-            
-            // Envelope suave pra não estourar o ouvido
-            gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.01);
-            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duracao);
-            
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            osc.start();
-            osc.stop(audioCtx.currentTime + duracao);
-        }
-        
-        function tocarAlertaCritico() {
-            const agora = Date.now();
-            if (agora - ultimoBeepCritico < DEBOUNCE_BEEP_MS) return;
-            ultimoBeepCritico = agora;
-            
-            // Bip duplo (tom mais urgente)
-            tocarBeep(1000, 0.15, 'square');
-            setTimeout(() => tocarBeep(1400, 0.2, 'square'), 180);
-            addLog("🚨 ALERTA SONORO CRÍTICO!");
-        }
-        
-        function toggleSom() {
-            somAtivo = !somAtivo;
-            document.getElementById('btnSom').innerText = somAtivo ? '🔊 Som: ON' : '🔇 Som: OFF';
-            addLog(somAtivo ? "Som ativado" : "Som desativado");
-        }
-        
-        // ==================== LOGS ====================
         function addLog(texto) {
             const log = document.getElementById('logEventos');
             const hora = new Date().toLocaleTimeString();
             logLines.push(`[${hora}] ${texto}`);
             
-            if (logLines.length > MAX_LOG_LINES) logLines.shift();
+            if(logLines.length > MAX_LOG_LINES) {
+                logLines.shift();
+            }
             
             log.innerHTML = '<strong>Log de Eventos:</strong><br>' + logLines.join('<br>');
             log.scrollTop = log.scrollHeight;
@@ -230,14 +188,15 @@
         
         function limparLogs() {
             logLines = [];
-            document.getElementById('logEventos').innerHTML = '<strong>Log de Eventos:</strong><br>';
+            const log = document.getElementById('logEventos');
+            log.innerHTML = '<strong>Log de Eventos:</strong><br>';
             addLog("Logs limpos");
         }
         
-        // ==================== BLUETOOTH ====================
         async function scanDevices() {
             try {
                 addLog("Buscando dispositivos...");
+                
                 device = await navigator.bluetooth.requestDevice({
                     filters: [
                         { name: 'ColeiraInteligente' },
@@ -245,21 +204,29 @@
                     ],
                     optionalServices: [SERVICE_UUID]
                 });
+                
                 addLog("Dispositivo selecionado: " + device.name);
                 document.getElementById('status').innerText = 'Selecionado: ' + device.name;
                 document.getElementById('btnLigar').style.display = 'inline';
                 document.getElementById('btnLimparLogs').style.display = 'inline';
-                document.getElementById('btnSom').style.display = 'inline';
-            } catch (erro) {
-                if (erro.message.includes('cancelled')) addLog("Busca cancelada");
-                else addLog("Erro: " + erro.message);
+                
+            } catch(erro) {
+                if(erro.message.includes('cancelled')) {
+                    addLog("Busca cancelada");
+                } else {
+                    addLog("Erro: " + erro.message);
+                }
             }
         }
         
         async function conectar() {
             try {
                 addLog("Conectando...");
-                if (!device) { addLog("Erro: Nenhum dispositivo selecionado"); return; }
+                
+                if(!device) {
+                    addLog("Erro: Nenhum dispositivo selecionado");
+                    return;
+                }
                 
                 device.removeEventListener('gattserverdisconnected', onDisconnected);
                 device.addEventListener('gattserverdisconnected', onDisconnected);
@@ -272,14 +239,14 @@
                 characteristic.addEventListener('characteristicvaluechanged', receberDados);
                 
                 conectado = true;
+                
                 document.getElementById('status').innerText = 'Conectado';
                 document.getElementById('btnLigar').style.display = 'none';
                 document.getElementById('btnDesligar').style.display = 'inline';
+                
                 addLog("Conectado com sucesso!");
                 
-                // Inicializa áudio no primeiro clique (exigência dos browsers)
-                initAudio();
-            } catch (erro) {
+            } catch(erro) {
                 addLog("Erro ao conectar: " + erro.message);
                 resetConexao();
             }
@@ -288,18 +255,31 @@
         async function desconectar() {
             try {
                 addLog("Desconectando...");
-                if (characteristic) {
-                    try { await characteristic.stopNotifications(); } catch(e) {}
+                
+                if(characteristic) {
+                    try {
+                        await characteristic.stopNotifications();
+                    } catch(e) {}
                     characteristic.removeEventListener('characteristicvaluechanged', receberDados);
                     characteristic = null;
                 }
-                if (server) {
-                    try { if (server.connected) server.disconnect(); } catch(e) {}
+                
+                if(server) {
+                    try {
+                        if(server.connected) {
+                            server.disconnect();
+                        }
+                    } catch(e) {}
                     server = null;
                 }
-                if (device) device.removeEventListener('gattserverdisconnected', onDisconnected);
+                
+                if(device) {
+                    device.removeEventListener('gattserverdisconnected', onDisconnected);
+                }
+                
                 onDisconnected();
-            } catch (erro) {
+                
+            } catch(erro) {
                 addLog("Erro ao desconectar: " + erro.message);
                 resetConexao();
             }
@@ -307,13 +287,16 @@
         
         function resetConexao() {
             addLog("Resetando conexão...");
-            device = null; server = null; characteristic = null; conectado = false;
+            
+            device = null;
+            server = null;
+            characteristic = null;
+            conectado = false;
             
             document.getElementById('status').innerText = 'Não conectado';
             document.getElementById('btnLigar').style.display = 'none';
             document.getElementById('btnDesligar').style.display = 'none';
             document.getElementById('btnLimparLogs').style.display = 'none';
-            document.getElementById('btnSom').style.display = 'none';
             document.getElementById('campoDistancia').value = '';
             document.getElementById('campoAceleracao').value = '';
             document.getElementById('campoComportamento').value = '';
@@ -321,6 +304,7 @@
             const alerta = document.getElementById('alerta');
             alerta.className = 'alerta parado';
             document.getElementById('alertaTexto').innerText = 'Aguardando dados...';
+            
             addLog("Conexão resetada. Selecione o dispositivo novamente.");
         }
         
@@ -329,15 +313,14 @@
             resetConexao();
         }
         
-        // ==================== PROCESSAMENTO DE DADOS ====================
         function receberDados(event) {
-            if (!conectado) return;
+            if(!conectado) return;
             
             const valor = event.target.value;
             const texto = new TextDecoder().decode(valor);
             const partes = texto.split(',');
             
-            if (partes.length >= 6) {
+            if(partes.length >= 6) {
                 const ax = parseFloat(partes[0]);
                 const ay = parseFloat(partes[1]);
                 const az = parseFloat(partes[2]);
@@ -345,79 +328,70 @@
                 const gy = parseFloat(partes[4]);
                 const gz = parseFloat(partes[5]);
                 
-                // --- RSSI simulado (Web Bluetooth API não expõe RSSI real) ---
-                rssiVariacao = (Math.random() - 0.5) * 10;
+                // Simula RSSI com variação realista (ruído)
+                rssiVariacao = (Math.random() - 0.5) * 10; // Variação de -5 a +5
                 let rssiAtual = rssiBase + rssiVariacao;
                 rssiAtual = Math.max(-90, Math.min(-40, rssiAtual));
                 
-                // --- Aceleração LINEAR real (remove a gravidade) ---
-                const magTotal = Math.sqrt(ax**2 + ay**2 + az**2);
-                const acelLinear = Math.max(0, magTotal - 9.8);
+                // Calcula magnitude da aceleração
+                const mag = Math.sqrt(ax**2 + ay**2 + az**2);
                 
-                // --- Magnitude do giroscópio (rotação real) ---
+                // Calcula magnitude do giroscópio
                 const giroMag = Math.sqrt(gx**2 + gy**2 + gz**2);
                 
-                // --- Classificação de comportamento ---
-                let comportamento, classeAlerta, mensagemAlerta;
+                // Interpreta comportamento
+                let comportamento = '';
+                let classeAlerta = '';
+                let mensagemAlerta = '';
                 
-                if (acelLinear < 0.5 && giroMag < 0.15) {
+                if(mag < 10.5 && giroMag < 0.1) {
                     comportamento = 'PARADO';
                     classeAlerta = 'parado';
-                    mensagemAlerta = '🐕 Animal em repouso';
-                } else if (acelLinear < 1.5 && giroMag < 0.6) {
+                    mensagemAlerta = 'Animal em repouso';
+                } else if(mag < 11 && giroMag < 0.5) {
                     comportamento = 'MOVIMENTO LEVE';
                     classeAlerta = 'movimento-leve';
-                    mensagemAlerta = '🐾 Movimento leve detectado';
-                } else if (acelLinear < 4.0 && giroMag < 2.0) {
+                    mensagemAlerta = 'Movimento leve detectado';
+                } else if(mag < 12 && giroMag < 1.5) {
                     comportamento = 'ANDANDO';
                     classeAlerta = 'andando';
-                    mensagemAlerta = '🚶 Animal em caminhada';
-                } else if (giroMag < 4.0) {
+                    mensagemAlerta = 'Animal em caminhada';
+                } else if(mag >= 12 || giroMag >= 1.5) {
                     comportamento = 'CORRENDO';
                     classeAlerta = 'correndo';
-                    mensagemAlerta = '🏃 Animal correndo';
+                    mensagemAlerta = 'Animal correndo';
                 } else {
-                    // Giroscópio muito alto = tremor/vibração intensa = estresse
                     comportamento = 'AGITADO';
                     classeAlerta = 'agitado';
-                    mensagemAlerta = '⚠️ Animal agitado/possível estresse';
+                    mensagemAlerta = 'Animal agitado/estressado';
                 }
                 
-                // --- Estimativa de distância baseada no RSSI ---
+                // Estima distância baseada no RSSI
                 let distancia = '';
-                let estaDistante = false;
-                if (rssiAtual > -50) {
+                if(rssiAtual > -50) {
                     distancia = 'Próximo (< 1m)';
-                } else if (rssiAtual > -70) {
+                } else if(rssiAtual > -70) {
                     distancia = 'Médio (1-3m)';
                 } else {
                     distancia = 'Distante (> 3m)';
-                    estaDistante = true;
                 }
                 
-                // --- Detecção de estado crítico ---
-                const estadoCritico = (comportamento === 'CORRENDO' || comportamento === 'AGITADO') 
-                                      && estaDistante;
-                
-                // --- Atualiza interface ---
+                // Atualiza campos
                 document.getElementById('campoDistancia').value = 
                     `RSSI: ${rssiAtual.toFixed(0)} dBm - ${distancia}`;
                 
                 document.getElementById('campoAceleracao').value = 
-                    `${comportamento} (Acel. linear: ${acelLinear.toFixed(2)} m/s² | Giro: ${giroMag.toFixed(2)} rad/s)`;
+                    `${comportamento} (Magnitude: ${mag.toFixed(1)} m/s²)`;
                 
                 document.getElementById('campoComportamento').value = 
-                    `Estado: ${comportamento}${estadoCritico ? ' 🚨 CRÍTICO' : ''}`;
+                    `Estado: ${comportamento}`;
                 
+                // Atualiza alerta SEMPRE visível
                 const alerta = document.getElementById('alerta');
-                alerta.className = `alerta ${classeAlerta}${estadoCritico ? ' critico' : ''}`;
-                document.getElementById('alertaTexto').innerText = 
-                    mensagemAlerta + (estadoCritico ? ' - POSSÍVEL FUGA!' : '');
+                alerta.className = `alerta ${classeAlerta}`;
+                document.getElementById('alertaTexto').innerText = mensagemAlerta;
                 
-                // --- Toca alerta sonoro se crítico ---
-                if (estadoCritico) tocarAlertaCritico();
-                
-                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Acel: ${acelLinear.toFixed(2)} | Giro: ${giroMag.toFixed(2)}`);
+                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Mag: ${mag.toFixed(1)}`);
             }
         }
     </script>
