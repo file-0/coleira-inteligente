@@ -35,6 +35,10 @@
         body.dark .alerta.andando { background: #3a3510; border-color: #ffeb3b; color: #fff176; }
         body.dark .alerta.correndo { background: #3a2410; border-color: #ff9800; color: #ffb74d; }
         body.dark .alerta.agitado { background: #3a1010; border-color: #f44336; color: #e57373; }
+        body.dark .modal { background: #2a2a2a; color: #e0e0e0; }
+        body.dark .modal h2 { color: #6fa8dc; }
+        body.dark .modal p { color: #aaa; }
+        body.dark .modal input { background: #1a1a1a; color: #e0e0e0; border-color: #6fa8dc; }
         
         .header {
             background: #3b5998;
@@ -47,7 +51,7 @@
             align-items: center;
         }
         
-        .header-titulo { flex: 1; }
+        .header-titulo { flex: 1; text-align: left; }
         
         .header-info {
             display: flex;
@@ -65,10 +69,10 @@
             background: rgba(255,255,255,0.2);
             color: white;
             border: 1px solid rgba(255,255,255,0.4);
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 13px;
         }
         
         .btn-tema:hover { background: rgba(255,255,255,0.3); }
@@ -177,18 +181,11 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
         
-        body.dark .modal {
-            background: #2a2a2a;
-            color: #e0e0e0;
-        }
-        
         .modal h2 {
             color: #3b5998;
             margin-bottom: 10px;
             text-align: center;
         }
-        
-        body.dark .modal h2 { color: #6fa8dc; }
         
         .modal p {
             margin-bottom: 20px;
@@ -196,8 +193,6 @@
             font-size: 14px;
             color: #666;
         }
-        
-        body.dark .modal p { color: #aaa; }
         
         .modal input {
             width: 100%;
@@ -208,12 +203,6 @@
             margin-bottom: 15px;
             background: white;
             color: #222;
-        }
-        
-        body.dark .modal input {
-            background: #1a1a1a;
-            color: #e0e0e0;
-            border-color: #6fa8dc;
         }
         
         .modal button {
@@ -234,12 +223,12 @@
     </style>
 </head>
 <body>
-    <!-- Modal de configuração inicial -->
+    <!-- Modal de configuração inicial - SEMPRE aparece ao abrir -->
     <div class="modal-overlay" id="modalConfig">
         <div class="modal">
-            <h2>🐕 Coleira Inteligente</h2>
-            <p>Antes de iniciar o monitoramento, informe o nome de quem vai usar a coleira (animal, criança, etc.)</p>
-            <input type="text" id="inputNome" placeholder="Ex: Rex, Luna, Joãozinho..." maxlength="30">
+            <h2>Coleira Inteligente</h2>
+            <p>Antes de iniciar o monitoramento, informe o nome de quem vai usar a coleira (animal, crianca, etc.)</p>
+            <input type="text" id="inputNome" placeholder="Ex: Rex, Luna, Joaozinho..." maxlength="30">
             <button onclick="salvarNome()">Iniciar Monitoramento</button>
         </div>
     </div>
@@ -248,13 +237,13 @@
         <div class="header-titulo">Coleira Inteligente</div>
         <div class="header-info">
             <span class="nome-individuo" id="exibeNome"></span>
-            <button class="btn-tema" onclick="toggleTema()" title="Alternar tema">🌓</button>
+            <button class="btn-tema" onclick="toggleTema()" id="btnTema">Tema: Claro</button>
         </div>
     </div>
     
     <div class="row">
         <button class="btn btn-cinza" onclick="scanDevices()">Dispositivos</button>
-        <div class="texto" id="status">Não conectado</div>
+        <div class="texto" id="status">Nao conectado</div>
     </div>
     
     <div class="row">
@@ -265,7 +254,7 @@
     
     <div class="status-box">
         <h3>Status</h3>
-        <input type="text" class="campo" id="campoDistancia" placeholder="Distância (RSSI)" readonly>
+        <input type="text" class="campo" id="campoDistancia" placeholder="Distancia (RSSI)" readonly>
         <input type="text" class="campo" id="campoAceleracao" placeholder="Movimento" readonly>
         <input type="text" class="campo" id="campoComportamento" placeholder="Comportamento" readonly>
     </div>
@@ -293,23 +282,11 @@
         let logLines = [];
         const MAX_LOG_LINES = 50;
         
-        // ===== INICIALIZAÇÃO (TEMA + NOME) =====
+        // ===== INICIALIZAÇÃO =====
         function init() {
-            // Carrega tema salvo
-            if (localStorage.getItem('tema') === 'dark') {
-                document.body.classList.add('dark');
-            }
-            
-            // Carrega nome salvo
-            const nomeSalvo = localStorage.getItem('nomeIndividuo');
-            if (nomeSalvo) {
-                nomeIndividuo = nomeSalvo;
-                document.getElementById('exibeNome').innerText = `👤 ${nomeIndividuo}`;
-                document.getElementById('modalConfig').classList.add('hidden');
-            } else {
-                // Foca no input automaticamente
-                setTimeout(() => document.getElementById('inputNome').focus(), 100);
-            }
+            // Sempre pede o nome ao abrir/reiniciar (sem localStorage)
+            document.getElementById('modalConfig').classList.remove('hidden');
+            setTimeout(() => document.getElementById('inputNome').focus(), 100);
         }
         
         function salvarNome() {
@@ -323,16 +300,15 @@
             }
             
             nomeIndividuo = nome;
-            localStorage.setItem('nomeIndividuo', nome);
-            document.getElementById('exibeNome').innerText = `👤 ${nomeIndividuo}`;
+            document.getElementById('exibeNome').innerText = nomeIndividuo;
             document.getElementById('modalConfig').classList.add('hidden');
-            addLog(`✅ Monitoramento iniciado para: ${nomeIndividuo}`);
+            addLog(`Monitoramento iniciado para: ${nomeIndividuo}`);
         }
         
         function toggleTema() {
             document.body.classList.toggle('dark');
-            const tema = document.body.classList.contains('dark') ? 'dark' : 'light';
-            localStorage.setItem('tema', tema);
+            const btn = document.getElementById('btnTema');
+            btn.innerText = document.body.classList.contains('dark') ? 'Tema: Escuro' : 'Tema: Claro';
         }
         
         // ===== LOGS =====
@@ -359,7 +335,7 @@
         // ===== BLUETOOTH =====
         async function scanDevices() {
             if (!nomeIndividuo) {
-                alert("Configure o nome do indivíduo primeiro!");
+                alert("Configure o nome do individuo primeiro!");
                 document.getElementById('modalConfig').classList.remove('hidden');
                 return;
             }
@@ -391,7 +367,7 @@
         
         async function conectar() {
             if (!nomeIndividuo) {
-                alert("Configure o nome do indivíduo primeiro!");
+                alert("Configure o nome do individuo primeiro!");
                 document.getElementById('modalConfig').classList.remove('hidden');
                 return;
             }
@@ -420,7 +396,7 @@
                 document.getElementById('btnLigar').style.display = 'none';
                 document.getElementById('btnDesligar').style.display = 'inline';
                 
-                addLog(`✅ Conectado! Monitorando ${nomeIndividuo} com sucesso!`);
+                addLog(`Conectado! Monitorando ${nomeIndividuo} com sucesso!`);
                 
             } catch(erro) {
                 addLog("Erro ao conectar: " + erro.message);
@@ -456,14 +432,14 @@
         }
         
         function resetConexao() {
-            addLog("Resetando conexão...");
+            addLog("Resetando conexao...");
             
             device = null;
             server = null;
             characteristic = null;
             conectado = false;
             
-            document.getElementById('status').innerText = 'Não conectado';
+            document.getElementById('status').innerText = 'Nao conectado';
             document.getElementById('btnLigar').style.display = 'none';
             document.getElementById('btnDesligar').style.display = 'none';
             document.getElementById('btnLimparLogs').style.display = 'none';
@@ -475,7 +451,7 @@
             alerta.className = 'alerta parado';
             document.getElementById('alertaTexto').innerText = 'Aguardando dados...';
             
-            addLog("Conexão resetada. Selecione o dispositivo novamente.");
+            addLog("Conexao resetada. Selecione o dispositivo novamente.");
         }
         
         function onDisconnected() {
@@ -535,9 +511,9 @@
                 
                 let distancia = '';
                 if(rssiAtual > -50) {
-                    distancia = 'Próximo (< 1m)';
+                    distancia = 'Proximo (< 1m)';
                 } else if(rssiAtual > -70) {
-                    distancia = 'Médio (1-3m)';
+                    distancia = 'Medio (1-3m)';
                 } else {
                     distancia = 'Distante (> 3m)';
                 }
