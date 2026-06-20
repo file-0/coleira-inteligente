@@ -329,38 +329,42 @@
                 const gz = parseFloat(partes[5]);
                 
                 // Simula RSSI com variação realista (ruído)
-                rssiVariacao = (Math.random() - 0.5) * 10; // Variação de -5 a +5
+                rssiVariacao = (Math.random() - 0.5) * 10;
                 let rssiAtual = rssiBase + rssiVariacao;
                 rssiAtual = Math.max(-90, Math.min(-40, rssiAtual));
                 
-                // Calcula magnitude da aceleração
-                const mag = Math.sqrt(ax**2 + ay**2 + az**2);
+                // Calcula magnitude total da aceleração (inclui gravidade)
+                const magTotal = Math.sqrt(ax**2 + ay**2 + az**2);
+                
+                // Calcula aceleração LINEAR real (remove gravidade ~9.8 m/s²)
+                const acelLinear = Math.max(0, magTotal - 9.8);
                 
                 // Calcula magnitude do giroscópio
                 const giroMag = Math.sqrt(gx**2 + gy**2 + gz**2);
                 
-                // Interpreta comportamento
+                // Interpreta comportamento com limiares ajustados
                 let comportamento = '';
                 let classeAlerta = '';
                 let mensagemAlerta = '';
                 
-                if(mag < 10.5 && giroMag < 0.1) {
+                if (acelLinear < 0.3 && giroMag < 0.1) {
                     comportamento = 'PARADO';
                     classeAlerta = 'parado';
                     mensagemAlerta = 'Animal em repouso';
-                } else if(mag < 11 && giroMag < 0.5) {
+                } else if (acelLinear < 1.0 && giroMag < 0.5) {
                     comportamento = 'MOVIMENTO LEVE';
                     classeAlerta = 'movimento-leve';
                     mensagemAlerta = 'Movimento leve detectado';
-                } else if(mag < 12 && giroMag < 1.5) {
+                } else if (acelLinear < 3.0 && giroMag < 1.5) {
                     comportamento = 'ANDANDO';
                     classeAlerta = 'andando';
                     mensagemAlerta = 'Animal em caminhada';
-                } else if(mag >= 12 || giroMag >= 1.5) {
+                } else if (giroMag < 3.5) {
                     comportamento = 'CORRENDO';
                     classeAlerta = 'correndo';
                     mensagemAlerta = 'Animal correndo';
                 } else {
+                    // Giroscópio muito alto = tremor/vibração intensa
                     comportamento = 'AGITADO';
                     classeAlerta = 'agitado';
                     mensagemAlerta = 'Animal agitado/estressado';
@@ -381,7 +385,7 @@
                     `RSSI: ${rssiAtual.toFixed(0)} dBm - ${distancia}`;
                 
                 document.getElementById('campoAceleracao').value = 
-                    `${comportamento} (Magnitude: ${mag.toFixed(1)} m/s²)`;
+                    `${comportamento} (Acel. linear: ${acelLinear.toFixed(2)} m/s² | Giro: ${giroMag.toFixed(2)} rad/s)`;
                 
                 document.getElementById('campoComportamento').value = 
                     `Estado: ${comportamento}`;
@@ -391,7 +395,7 @@
                 alerta.className = `alerta ${classeAlerta}`;
                 document.getElementById('alertaTexto').innerText = mensagemAlerta;
                 
-                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Mag: ${mag.toFixed(1)}`);
+                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Acel: ${acelLinear.toFixed(2)} | Giro: ${giroMag.toFixed(2)}`);
             }
         }
     </script>
