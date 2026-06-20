@@ -342,24 +342,24 @@
                 // Calcula magnitude do giroscópio
                 const giroMag = Math.sqrt(gx**2 + gy**2 + gz**2);
                 
-                // Interpreta comportamento com limiares ajustados
+                // Interpreta comportamento com limiares MUITO mais abrangentes
                 let comportamento = '';
                 let classeAlerta = '';
                 let mensagemAlerta = '';
                 
-                if (acelLinear < 0.3 && giroMag < 0.1) {
+                if (acelLinear < 0.8 && giroMag < 0.3) {
                     comportamento = 'PARADO';
                     classeAlerta = 'parado';
                     mensagemAlerta = 'Animal em repouso';
-                } else if (acelLinear < 1.0 && giroMag < 0.5) {
+                } else if (acelLinear < 2.0 && giroMag < 1.0) {
                     comportamento = 'MOVIMENTO LEVE';
                     classeAlerta = 'movimento-leve';
                     mensagemAlerta = 'Movimento leve detectado';
-                } else if (acelLinear < 3.0 && giroMag < 1.5) {
+                } else if (acelLinear < 5.0 && giroMag < 2.5) {
                     comportamento = 'ANDANDO';
                     classeAlerta = 'andando';
                     mensagemAlerta = 'Animal em caminhada';
-                } else if (giroMag < 3.5) {
+                } else if (giroMag < 5.0) {
                     comportamento = 'CORRENDO';
                     classeAlerta = 'correndo';
                     mensagemAlerta = 'Animal correndo';
@@ -385,7 +385,7 @@
                     `RSSI: ${rssiAtual.toFixed(0)} dBm - ${distancia}`;
                 
                 document.getElementById('campoAceleracao').value = 
-                    `${comportamento} (Acel. linear: ${acelLinear.toFixed(2)} m/s² | Giro: ${giroMag.toFixed(2)} rad/s)`;
+                    `${comportamento} (Acel: ${acelLinear.toFixed(2)} | Giro: ${giroMag.toFixed(2)})`;
                 
                 document.getElementById('campoComportamento').value = 
                     `Estado: ${comportamento}`;
@@ -395,7 +395,7 @@
                 alerta.className = `alerta ${classeAlerta}`;
                 document.getElementById('alertaTexto').innerText = mensagemAlerta;
                 
-                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} dBm | Acel: ${acelLinear.toFixed(2)} | Giro: ${giroMag.toFixed(2)}`);
+                addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} | Acel: ${acelLinear.toFixed(2)} | Giro: ${giroMag.toFixed(2)}`);
             }
         }
     </script>
