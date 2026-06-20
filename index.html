@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Coleira Inteligente - V5</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/5308/5308419.png">
     <style>
         * { 
             margin: 0; 
@@ -498,11 +499,11 @@
                 } else if (acelLinear < 5.0 && giroMag < 2.5) {
                     comportamento = 'ANDANDO';
                     classeAlerta = 'andando';
-                    mensagemAlerta = `${nomeIndividuo} em caminhada`;
+                    mensagemAlerta = `${nomeIndividuo} está caminhando`;
                 } else if (giroMag < 5.0) {
                     comportamento = 'CORRENDO';
                     classeAlerta = 'correndo';
-                    mensagemAlerta = `${nomeIndividuo} correndo`;
+                    mensagemAlerta = `${nomeIndividuo} está correndo`;
                 } else {
                     comportamento = 'AGITADO';
                     classeAlerta = 'agitado';
