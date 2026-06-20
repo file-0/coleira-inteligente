@@ -5,8 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Coleira Inteligente - V5</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
-        body { background: #f0f0f0; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: Arial, sans-serif;
+            transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+        }
+        
+        body { 
+            background: #f0f0f0; 
+            color: #222;
+        }
+        
+        /* ===== TEMA ESCURO ===== */
+        body.dark { 
+            background: #1a1a1a; 
+            color: #e0e0e0;
+        }
+        body.dark .header { background: #1e3a5f; }
+        body.dark .row { background: #2a2a2a; }
+        body.dark .texto { background: #2a2a2a; border-color: #444; color: #e0e0e0; }
+        body.dark .area-log { background: #2a2a2a; border-color: #444; color: #e0e0e0; }
+        body.dark .campo { background: #2a2a2a; border-color: #444; color: #e0e0e0; }
+        body.dark .status-box { background: #2a2a2a; border-color: #1e3a5f; }
+        body.dark .status-box h3 { color: #6fa8dc; }
+        body.dark .alerta.parado { background: #1b3a1b; border-color: #4CAF50; color: #81c784; }
+        body.dark .alerta.movimento-leve { background: #0d2a3a; border-color: #03a9f4; color: #4fc3f7; }
+        body.dark .alerta.andando { background: #3a3510; border-color: #ffeb3b; color: #fff176; }
+        body.dark .alerta.correndo { background: #3a2410; border-color: #ff9800; color: #ffb74d; }
+        body.dark .alerta.agitado { background: #3a1010; border-color: #f44336; color: #e57373; }
         
         .header {
             background: #3b5998;
@@ -14,7 +42,36 @@
             padding: 15px;
             font-size: 20px;
             text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
+        
+        .header-titulo { flex: 1; }
+        
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .nome-individuo {
+            font-weight: bold;
+            font-style: italic;
+        }
+        
+        .btn-tema {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.4);
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn-tema:hover { background: rgba(255,255,255,0.3); }
         
         .row {
             display: flex;
@@ -58,13 +115,6 @@
             font-family: monospace;
         }
         
-        .select {
-            padding: 8px;
-            margin: 10px;
-            border: 1px solid #ccc;
-            background: #f9f9f9;
-        }
-        
         .campo {
             padding: 10px;
             margin: 5px 10px;
@@ -72,6 +122,7 @@
             background: white;
             width: calc(100% - 20px);
             font-size: 14px;
+            color: #222;
         }
         
         .status-box {
@@ -99,39 +150,107 @@
             transition: all 0.3s ease;
         }
         
-        .alerta.parado {
-            background: #c8e6c9;
-            border-color: #4CAF50;
-            color: #2e7d32;
+        .alerta.parado { background: #c8e6c9; border-color: #4CAF50; color: #2e7d32; }
+        .alerta.movimento-leve { background: #b3e5fc; border-color: #03a9f4; color: #01579b; }
+        .alerta.andando { background: #fff9c4; border-color: #ffeb3b; color: #f57f17; }
+        .alerta.correndo { background: #ffe0b2; border-color: #ff9800; color: #e65100; }
+        .alerta.agitado { background: #ffcdd2; border-color: #f44336; color: #c62828; }
+        
+        /* ===== MODAL DE CONFIGURAÇÃO INICIAL ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
         }
         
-        .alerta.movimento-leve {
-            background: #b3e5fc;
-            border-color: #03a9f4;
-            color: #01579b;
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
         }
         
-        .alerta.andando {
-            background: #fff9c4;
-            border-color: #ffeb3b;
-            color: #f57f17;
+        body.dark .modal {
+            background: #2a2a2a;
+            color: #e0e0e0;
         }
         
-        .alerta.correndo {
-            background: #ffe0b2;
-            border-color: #ff9800;
-            color: #e65100;
+        .modal h2 {
+            color: #3b5998;
+            margin-bottom: 10px;
+            text-align: center;
         }
         
-        .alerta.agitado {
-            background: #ffcdd2;
-            border-color: #f44336;
-            color: #c62828;
+        body.dark .modal h2 { color: #6fa8dc; }
+        
+        .modal p {
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
         }
+        
+        body.dark .modal p { color: #aaa; }
+        
+        .modal input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #3b5998;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            background: white;
+            color: #222;
+        }
+        
+        body.dark .modal input {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            border-color: #6fa8dc;
+        }
+        
+        .modal button {
+            width: 100%;
+            padding: 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .modal button:hover { background: #45a049; }
+        
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
-    <div class="header">Coleira Inteligente - Monitoramento Comportamental</div>
+    <!-- Modal de configuração inicial -->
+    <div class="modal-overlay" id="modalConfig">
+        <div class="modal">
+            <h2>🐕 Coleira Inteligente</h2>
+            <p>Antes de iniciar o monitoramento, informe o nome de quem vai usar a coleira (animal, criança, etc.)</p>
+            <input type="text" id="inputNome" placeholder="Ex: Rex, Luna, Joãozinho..." maxlength="30">
+            <button onclick="salvarNome()">Iniciar Monitoramento</button>
+        </div>
+    </div>
+    
+    <div class="header">
+        <div class="header-titulo">Coleira Inteligente</div>
+        <div class="header-info">
+            <span class="nome-individuo" id="exibeNome"></span>
+            <button class="btn-tema" onclick="toggleTema()" title="Alternar tema">🌓</button>
+        </div>
+    </div>
     
     <div class="row">
         <button class="btn btn-cinza" onclick="scanDevices()">Dispositivos</button>
@@ -166,6 +285,7 @@
         let conectado = false;
         let rssiBase = -55;
         let rssiVariacao = 0;
+        let nomeIndividuo = '';
         
         const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
         const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
@@ -173,6 +293,49 @@
         let logLines = [];
         const MAX_LOG_LINES = 50;
         
+        // ===== INICIALIZAÇÃO (TEMA + NOME) =====
+        function init() {
+            // Carrega tema salvo
+            if (localStorage.getItem('tema') === 'dark') {
+                document.body.classList.add('dark');
+            }
+            
+            // Carrega nome salvo
+            const nomeSalvo = localStorage.getItem('nomeIndividuo');
+            if (nomeSalvo) {
+                nomeIndividuo = nomeSalvo;
+                document.getElementById('exibeNome').innerText = `👤 ${nomeIndividuo}`;
+                document.getElementById('modalConfig').classList.add('hidden');
+            } else {
+                // Foca no input automaticamente
+                setTimeout(() => document.getElementById('inputNome').focus(), 100);
+            }
+        }
+        
+        function salvarNome() {
+            const input = document.getElementById('inputNome');
+            const nome = input.value.trim();
+            
+            if (nome.length < 2) {
+                input.style.borderColor = '#f44336';
+                input.placeholder = 'Digite pelo menos 2 caracteres!';
+                return;
+            }
+            
+            nomeIndividuo = nome;
+            localStorage.setItem('nomeIndividuo', nome);
+            document.getElementById('exibeNome').innerText = `👤 ${nomeIndividuo}`;
+            document.getElementById('modalConfig').classList.add('hidden');
+            addLog(`✅ Monitoramento iniciado para: ${nomeIndividuo}`);
+        }
+        
+        function toggleTema() {
+            document.body.classList.toggle('dark');
+            const tema = document.body.classList.contains('dark') ? 'dark' : 'light';
+            localStorage.setItem('tema', tema);
+        }
+        
+        // ===== LOGS =====
         function addLog(texto) {
             const log = document.getElementById('logEventos');
             const hora = new Date().toLocaleTimeString();
@@ -193,7 +356,14 @@
             addLog("Logs limpos");
         }
         
+        // ===== BLUETOOTH =====
         async function scanDevices() {
+            if (!nomeIndividuo) {
+                alert("Configure o nome do indivíduo primeiro!");
+                document.getElementById('modalConfig').classList.remove('hidden');
+                return;
+            }
+            
             try {
                 addLog("Buscando dispositivos...");
                 
@@ -205,7 +375,7 @@
                     optionalServices: [SERVICE_UUID]
                 });
                 
-                addLog("Dispositivo selecionado: " + device.name);
+                addLog(`Dispositivo selecionado para ${nomeIndividuo}: ${device.name}`);
                 document.getElementById('status').innerText = 'Selecionado: ' + device.name;
                 document.getElementById('btnLigar').style.display = 'inline';
                 document.getElementById('btnLimparLogs').style.display = 'inline';
@@ -220,8 +390,14 @@
         }
         
         async function conectar() {
+            if (!nomeIndividuo) {
+                alert("Configure o nome do indivíduo primeiro!");
+                document.getElementById('modalConfig').classList.remove('hidden');
+                return;
+            }
+            
             try {
-                addLog("Conectando...");
+                addLog(`Conectando (monitorando ${nomeIndividuo})...`);
                 
                 if(!device) {
                     addLog("Erro: Nenhum dispositivo selecionado");
@@ -240,11 +416,11 @@
                 
                 conectado = true;
                 
-                document.getElementById('status').innerText = 'Conectado';
+                document.getElementById('status').innerText = `Conectado - Monitorando ${nomeIndividuo}`;
                 document.getElementById('btnLigar').style.display = 'none';
                 document.getElementById('btnDesligar').style.display = 'inline';
                 
-                addLog("Conectado com sucesso!");
+                addLog(`✅ Conectado! Monitorando ${nomeIndividuo} com sucesso!`);
                 
             } catch(erro) {
                 addLog("Erro ao conectar: " + erro.message);
@@ -257,19 +433,13 @@
                 addLog("Desconectando...");
                 
                 if(characteristic) {
-                    try {
-                        await characteristic.stopNotifications();
-                    } catch(e) {}
+                    try { await characteristic.stopNotifications(); } catch(e) {}
                     characteristic.removeEventListener('characteristicvaluechanged', receberDados);
                     characteristic = null;
                 }
                 
                 if(server) {
-                    try {
-                        if(server.connected) {
-                            server.disconnect();
-                        }
-                    } catch(e) {}
+                    try { if(server.connected) server.disconnect(); } catch(e) {}
                     server = null;
                 }
                 
@@ -313,6 +483,7 @@
             resetConexao();
         }
         
+        // ===== PROCESSAMENTO DE DADOS =====
         function receberDados(event) {
             if(!conectado) return;
             
@@ -328,21 +499,14 @@
                 const gy = parseFloat(partes[4]);
                 const gz = parseFloat(partes[5]);
                 
-                // Simula RSSI com variação realista (ruído)
                 rssiVariacao = (Math.random() - 0.5) * 10;
                 let rssiAtual = rssiBase + rssiVariacao;
                 rssiAtual = Math.max(-90, Math.min(-40, rssiAtual));
                 
-                // Calcula magnitude total da aceleração (inclui gravidade)
                 const magTotal = Math.sqrt(ax**2 + ay**2 + az**2);
-                
-                // Calcula aceleração LINEAR real (remove gravidade ~9.8 m/s²)
                 const acelLinear = Math.max(0, magTotal - 9.8);
-                
-                // Calcula magnitude do giroscópio
                 const giroMag = Math.sqrt(gx**2 + gy**2 + gz**2);
                 
-                // Interpreta comportamento com limiares MUITO mais abrangentes
                 let comportamento = '';
                 let classeAlerta = '';
                 let mensagemAlerta = '';
@@ -350,27 +514,25 @@
                 if (acelLinear < 0.8 && giroMag < 0.3) {
                     comportamento = 'PARADO';
                     classeAlerta = 'parado';
-                    mensagemAlerta = 'Animal em repouso';
+                    mensagemAlerta = `${nomeIndividuo} em repouso`;
                 } else if (acelLinear < 2.0 && giroMag < 1.0) {
                     comportamento = 'MOVIMENTO LEVE';
                     classeAlerta = 'movimento-leve';
-                    mensagemAlerta = 'Movimento leve detectado';
+                    mensagemAlerta = `Movimento leve de ${nomeIndividuo}`;
                 } else if (acelLinear < 5.0 && giroMag < 2.5) {
                     comportamento = 'ANDANDO';
                     classeAlerta = 'andando';
-                    mensagemAlerta = 'Animal em caminhada';
+                    mensagemAlerta = `${nomeIndividuo} em caminhada`;
                 } else if (giroMag < 5.0) {
                     comportamento = 'CORRENDO';
                     classeAlerta = 'correndo';
-                    mensagemAlerta = 'Animal correndo';
+                    mensagemAlerta = `${nomeIndividuo} correndo`;
                 } else {
-                    // Giroscópio muito alto = tremor/vibração intensa
                     comportamento = 'AGITADO';
                     classeAlerta = 'agitado';
-                    mensagemAlerta = 'Animal agitado/estressado';
+                    mensagemAlerta = `${nomeIndividuo} agitado/estressado`;
                 }
                 
-                // Estima distância baseada no RSSI
                 let distancia = '';
                 if(rssiAtual > -50) {
                     distancia = 'Próximo (< 1m)';
@@ -380,7 +542,6 @@
                     distancia = 'Distante (> 3m)';
                 }
                 
-                // Atualiza campos
                 document.getElementById('campoDistancia').value = 
                     `RSSI: ${rssiAtual.toFixed(0)} dBm - ${distancia}`;
                 
@@ -390,7 +551,6 @@
                 document.getElementById('campoComportamento').value = 
                     `Estado: ${comportamento}`;
                 
-                // Atualiza alerta SEMPRE visível
                 const alerta = document.getElementById('alerta');
                 alerta.className = `alerta ${classeAlerta}`;
                 document.getElementById('alertaTexto').innerText = mensagemAlerta;
@@ -398,6 +558,9 @@
                 addLog(`${comportamento} | RSSI: ${rssiAtual.toFixed(0)} | Acel: ${acelLinear.toFixed(2)} | Giro: ${giroMag.toFixed(2)}`);
             }
         }
+        
+        // Inicializa ao carregar
+        init();
     </script>
 </body>
 </html>
